@@ -5,24 +5,28 @@
 namespace borrow {
 
 #ifndef borrow_verify
+#ifdef BORROW_INFER_CHECK
 #define borrow_verify(x) {if (!(x)) {volatile int* a = nullptr ; *a;}}
 //#define borrow_verify(x) nullptr
+#else
+#define borrow_verify(x) {if (!(x)) {abort();}}
+#endif
 #endif
 
 template<class T>
-class ref_ptr {
+class const_ptr {
  public:
-  volatile const T* raw_{nullptr};
+  const T* raw_{nullptr};
   int32_t* p_cnt_{nullptr};
-  ref_ptr() = default;
-  ref_ptr(const ref_ptr&) = delete;
-  ref_ptr(ref_ptr&& p) {
+  const_ptr() = default;
+  const_ptr(const const_ptr&) = delete;
+  const_ptr(const_ptr&& p) {
     raw_ = p.raw_; 
     p_cnt_ = p.p_cnt_;
     p.raw_ = nullptr;
     p.p_cnt_ = nullptr;
   };
-  ref_ptr(ref_ptr& p) {
+  const_ptr(const_ptr& p) {
     raw_ = p.raw_;
     p_cnt_ = p.p_cnt_;
     auto i = (*p_cnt_)++;
@@ -31,13 +35,13 @@ class ref_ptr {
   const T* operator->() {
     return raw_;
   }
-  void release() {
+  void reset() {
     auto i = (*p_cnt_)--;
     borrow_verify(i > 0);
     raw_ = nullptr;
     p_cnt_ = nullptr;
   }
-  ~ref_ptr() {
+  ~const_ptr() {
     if (p_cnt_ != nullptr) {
       auto i = (*p_cnt_)--;
       borrow_verify(i > 0);
@@ -60,7 +64,7 @@ class mut_ptr {
   T* operator->() {
     return raw_;
   }
-  void release() {
+  void reset() {
     auto i = (*p_cnt_)++;
     borrow_verify(i == -1);
     p_cnt_ = nullptr;
@@ -110,11 +114,11 @@ class own_ptr {
     return mut;
   }
 
-  inline ref_ptr<T> borrow_ref() {
+  inline const_ptr<T> borrow_const() {
     *raw_; // for refer static analysis
     auto i = cnt_++;
     borrow_verify(i >= 0);
-    ref_ptr<T> ref;
+    const_ptr<T> ref;
     ref.raw_ = raw_;
     ref.p_cnt_ = &cnt_;
     return ref;
@@ -125,7 +129,7 @@ class own_ptr {
     return raw_;
   }
 
-  void release() {
+  void reset() {
     borrow_verify(cnt_ == 0);
     delete raw_;
     raw_ = nullptr;
@@ -133,7 +137,7 @@ class own_ptr {
 
   ~own_ptr() {
     if (raw_) {
-      release();
+      reset();
     }
   }
 };
@@ -144,28 +148,28 @@ inline mut_ptr<T> borrow_mut(own_ptr<T>& own_ptr) {
 }
 
 template <typename T>
-inline ref_ptr<T> borrow_ref(own_ptr<T>& own_ptr) {
-  return std::forward<ref_ptr<T>>(own_ptr.borrow_ref());
+inline const_ptr<T> borrow_const(own_ptr<T>& own_ptr) {
+  return std::forward<const_ptr<T>>(own_ptr.borrow_const());
 }
 
 template <typename T>
-inline void release_ptr(own_ptr<T>& ptr) {
-  return ptr.release();
+inline void reset_ptr(own_ptr<T>& ptr) {
+  return ptr.reset();
 }
 
 template <typename T>
-inline void release_ptr(mut_ptr<T>& ptr) {
-  return ptr.release();
+inline void reset_ptr(mut_ptr<T>& ptr) {
+  return ptr.reset();
 }
 
 template <typename T>
-inline void release_ptr(ref_ptr<T>& ptr) {
-  return ptr.release();
+inline void reset_ptr(const_ptr<T>& ptr) {
+  return ptr.reset();
 }
 
 } // namespace borrow;
 
-// infer run --pulse-only -- clang++ -x c++ -std=c++11 -O0 borrow.h -D BORROW_TEST=1
+// infer run --pulse-only -- clang++ -x c++ -std=c++11 -O0 borrow.h -D BORROW_TEST=1 -D BORROW_INFER_CHECK=1
 #ifdef BORROW_TEST
 using namespace borrow;
 void test1() {
@@ -190,8 +194,8 @@ void test2() {
 void test3() {
   own_ptr<int> owner; 
   owner.reset(new int(5));
-  auto x = borrow_ref(owner);
-  auto y = borrow_ref(owner);
+  auto x = borrow_const(owner);
+  auto y = borrow_const(owner);
   auto z = borrow_mut(owner);
 }
 
