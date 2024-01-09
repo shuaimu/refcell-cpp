@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <memory>
 #include <utility>
+#include <atomic>
 
 namespace borrow {
 
@@ -17,7 +18,7 @@ template<class T>
 class const_ptr {
  public:
   const T* raw_{nullptr};
-  int32_t* p_cnt_{nullptr};
+  std::atomic<int32_t>* p_cnt_{nullptr};
   const_ptr() = default;
   const_ptr(const const_ptr&) = delete;
   const_ptr(const_ptr&& p) {
@@ -53,7 +54,7 @@ template <typename T>
 class mut_ptr {
  public:
   T* raw_;
-  int32_t* p_cnt_;
+  std::atomic<int32_t>* p_cnt_;
   mut_ptr() = default;
   mut_ptr(const mut_ptr&) = delete;
   mut_ptr(mut_ptr&& p) : raw_(p.raw_), p_cnt_(p.p_cnt_) {
@@ -102,7 +103,7 @@ class own_ptr {
     borrow_verify(cnt_ == 0); // is this enough to capture data race?
   }
   T* raw_{nullptr};
-  int32_t cnt_{0};
+  std::atomic<int32_t> cnt_{0};
 
   inline mut_ptr<T> borrow_mut() {
     mut_ptr<T> mut;
