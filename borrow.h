@@ -155,7 +155,7 @@ inline const_ptr<T> borrow_const(own_ptr<T>& own_ptr) {
 
 template <typename T>
 inline void reset_ptr(own_ptr<T>& ptr) {
-  return ptr.reset();
+  return ptr.reset(nullptr);
 }
 
 template <typename T>
