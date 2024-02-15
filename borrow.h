@@ -15,19 +15,19 @@ namespace borrow {
 #endif
 
 template<class T>
-class const_ptr {
+class RefConst {
  public:
   const T* raw_{nullptr};
   std::atomic<int32_t>* p_cnt_{nullptr};
-  const_ptr() = default;
-  const_ptr(const const_ptr&) = delete;
-  const_ptr(const_ptr&& p) {
+  RefConst() = default;
+  RefConst(const RefConst&) = delete;
+  RefConst(RefConst&& p) {
     raw_ = p.raw_; 
     p_cnt_ = p.p_cnt_;
     p.raw_ = nullptr;
     p.p_cnt_ = nullptr;
   };
-  const_ptr(const_ptr& p) {
+  RefConst(RefConst& p) {
     raw_ = p.raw_;
     p_cnt_ = p.p_cnt_;
     auto i = (*p_cnt_)++;
@@ -42,7 +42,7 @@ class const_ptr {
     raw_ = nullptr;
     p_cnt_ = nullptr;
   }
-  ~const_ptr() {
+  ~RefConst() {
     if (p_cnt_ != nullptr) {
       auto i = (*p_cnt_)--;
       borrow_verify(i > 0);
@@ -51,13 +51,13 @@ class const_ptr {
 };
 
 template <typename T>
-class mut_ptr {
+class RefMut {
  public:
   T* raw_;
   std::atomic<int32_t>* p_cnt_;
-  mut_ptr() = default;
-  mut_ptr(const mut_ptr&) = delete;
-  mut_ptr(mut_ptr&& p) : raw_(p.raw_), p_cnt_(p.p_cnt_) {
+  RefMut() = default;
+  RefMut(const RefMut&) = delete;
+  RefMut(RefMut&& p) : raw_(p.raw_), p_cnt_(p.p_cnt_) {
     raw_ = p.raw_;
     p.p_cnt_ = nullptr;
     p.raw_ = nullptr;
@@ -71,7 +71,7 @@ class mut_ptr {
     p_cnt_ = nullptr;
     raw_ = nullptr;
   }
-  ~mut_ptr() {
+  ~RefMut() {
     if (p_cnt_) {
       auto i = (*p_cnt_)++;
       borrow_verify(i == -1);
@@ -80,14 +80,14 @@ class mut_ptr {
 };
 
 template <class T>
-class own_ptr {
+class RefCell {
  public:
-  own_ptr(const own_ptr&) = delete;
-  own_ptr(): raw_(nullptr), cnt_(0) {
+  RefCell(const RefCell&) = delete;
+  RefCell(): raw_(nullptr), cnt_(0) {
   }
-  explicit own_ptr(T* p) : raw_(p), cnt_(0) {
+  explicit RefCell(T* p) : raw_(p), cnt_(0) {
   };
-  own_ptr(own_ptr&& p) {
+  RefCell(RefCell&& p) {
     auto i = p.cnt_.exchange(-2);
     borrow_verify(i==0);
     borrow_verify(cnt_ == 0);
@@ -105,8 +105,8 @@ class own_ptr {
   T* raw_{nullptr};
   std::atomic<int32_t> cnt_{0};
 
-  inline mut_ptr<T> borrow_mut() {
-    mut_ptr<T> mut;
+  inline RefMut<T> borrow_mut() {
+    RefMut<T> mut;
     borrow_verify(cnt_ == 0);
     cnt_--;
     mut.p_cnt_ = &cnt_;
@@ -115,11 +115,11 @@ class own_ptr {
     return mut;
   }
 
-  inline const_ptr<T> borrow_const() {
+  inline RefConst<T> borrow_const() {
     *raw_; // for refer static analysis
     auto i = cnt_++;
     borrow_verify(i >= 0);
-    const_ptr<T> ref;
+    RefConst<T> ref;
     ref.raw_ = raw_;
     ref.p_cnt_ = &cnt_;
     return ref;
@@ -136,7 +136,7 @@ class own_ptr {
     raw_ = nullptr;
   }
 
-  ~own_ptr() {
+  ~RefCell() {
     if (raw_) {
       reset();
     }
@@ -144,27 +144,27 @@ class own_ptr {
 };
 
 template <typename T>
-inline mut_ptr<T> borrow_mut(own_ptr<T>& own_ptr) {
-  return std::forward<mut_ptr<T>>(own_ptr.borrow_mut());
+inline RefMut<T> borrow_mut(RefCell<T>& RefCell) {
+  return std::forward<RefMut<T>>(RefCell.borrow_mut());
 }
 
 template <typename T>
-inline const_ptr<T> borrow_const(own_ptr<T>& own_ptr) {
-  return std::forward<const_ptr<T>>(own_ptr.borrow_const());
+inline RefConst<T> borrow_const(RefCell<T>& RefCell) {
+  return std::forward<RefConst<T>>(RefCell.borrow_const());
 }
 
 template <typename T>
-inline void reset_ptr(own_ptr<T>& ptr) {
+inline void reset_ptr(RefCell<T>& ptr) {
   return ptr.reset();
 }
 
 template <typename T>
-inline void reset_ptr(mut_ptr<T>& ptr) {
+inline void reset_ptr(RefMut<T>& ptr) {
   return ptr.reset();
 }
 
 template <typename T>
-inline void reset_ptr(const_ptr<T>& ptr) {
+inline void reset_ptr(RefConst<T>& ptr) {
   return ptr.reset();
 }
 
@@ -174,14 +174,14 @@ inline void reset_ptr(const_ptr<T>& ptr) {
 #ifdef BORROW_TEST
 using namespace borrow;
 void test1() {
-  own_ptr<int> owner; 
+  RefCell<int> owner; 
   owner.reset(new int(5));
   auto x = borrow_mut(owner);
   auto y = borrow_mut(owner);
 }
 
 void test2() {
-  own_ptr<int> owner; 
+  RefCell<int> owner; 
   owner.reset(new int(5));
   {
     auto x = borrow_mut(owner);
@@ -193,7 +193,7 @@ void test2() {
 }
 
 void test3() {
-  own_ptr<int> owner; 
+  RefCell<int> owner; 
   owner.reset(new int(5));
   auto x = borrow_const(owner);
   auto y = borrow_const(owner);
