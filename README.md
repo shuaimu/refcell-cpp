@@ -7,16 +7,16 @@
 using namespace borrow;
 
 int main() {
-  own_ptr<int> owner;
+  RefCell<int> owner;
   owner.reset(new int(5));
   {
-    mut_ptr<int> a = borrow_mut(owner); // mutable ptr
-    // mut_ptr<int> b = borrow_mut(owner); // wrong! only one mutable ptr at a time 
+    RefMut<int> a = borrow_mut(owner); // mutable ptr
+    // RefMut<int> b = borrow_mut(owner); // wrong! only one mutable ptr at a time 
   } // a's lifetime ends
   {
-    const_ptr<int> c = borrow_const(owner); // const (non-mutable) ptr
-    const_ptr<int> d = borrow_const(owner); // okay, multiple const ptrs are allowed
-    // mut_ptr<int> e = borrow_mut(owner); // wrong! mutable ptr is disallowed when there is a const ptr
+    RefConst<int> c = borrow_const(owner); // const (non-mutable) ptr
+    RefConst<int> d = borrow_const(owner); // okay, multiple const ptrs are allowed
+    // RefMut<int> e = borrow_mut(owner); // wrong! mutable ptr is disallowed when there is a const ptr
   }
   return 0;
 }
