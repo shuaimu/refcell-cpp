@@ -46,23 +46,23 @@ namespace borrow {
 
 
 template<class T>
-class RefConst {
+class Ref {
  public:
   const T* raw_{nullptr};
   std::atomic<int32_t>* p_cnt_{nullptr};
-  RefConst() = default;
-  RefConst(const RefConst&) = delete;
-  RefConst(RefConst&& p) {
+  Ref() = default;
+  Ref(const Ref&) = delete;
+  Ref(Ref&& p) {
     raw_ = p.raw_; 
     p_cnt_ = p.p_cnt_;
     p.raw_ = nullptr;
     p.p_cnt_ = nullptr;
   };
-  RefConst(RefConst& p) {
+  Ref(Ref& p) {
     raw_ = p.raw_;
     p_cnt_ = p.p_cnt_;
     auto i = (*p_cnt_)++;
-    borrow_verify(i > 0, "error in RefConst constructor");
+    borrow_verify(i > 0, "error in Ref constructor");
   }
   const T* operator->() {
     return raw_;
@@ -73,7 +73,7 @@ class RefConst {
     raw_ = nullptr;
     p_cnt_ = nullptr;
   }
-  ~RefConst() {
+  ~Ref() {
     if (p_cnt_ != nullptr) {
       auto i = (*p_cnt_)--;
       borrow_verify(i > 0, "Trying to dereference null pointer"); // failure means - count became negative which is not possible
@@ -146,11 +146,11 @@ class RefCell {
     return mut;
   }
 
-  inline RefConst<T> borrow_const() {
+  inline Ref<T> borrow_const() {
     // *raw_; // for refer static analysis
     auto i = cnt_++;
     borrow_verify(i >= 0, "verify failed in borrow_const");
-    RefConst<T> ref;
+    Ref<T> ref;
     ref.raw_ = raw_;
     ref.p_cnt_ = &cnt_;
     return ref;
@@ -180,8 +180,8 @@ inline RefMut<T> borrow_mut(RefCell<T>& RefCell) {
 }
 
 template <typename T>
-inline RefConst<T> borrow_const(RefCell<T>& RefCell) {
-  return std::forward<RefConst<T>>(RefCell.borrow_const());
+inline Ref<T> borrow_const(RefCell<T>& RefCell) {
+  return std::forward<Ref<T>>(RefCell.borrow_const());
 }
 
 template <typename T>
@@ -195,7 +195,7 @@ inline void reset_ptr(RefMut<T>& ptr) {
 }
 
 template <typename T>
-inline void reset_ptr(RefConst<T>& ptr) {
+inline void reset_ptr(Ref<T>& ptr) {
   return ptr.reset();
 }
 

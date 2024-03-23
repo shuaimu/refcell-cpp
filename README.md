@@ -14,8 +14,8 @@ int main() {
     // RefMut<int> b = borrow_mut(owner); // wrong! only one mutable ptr at a time 
   } // a's lifetime ends
   {
-    RefConst<int> c = borrow_const(owner); // const (non-mutable) ptr
-    RefConst<int> d = borrow_const(owner); // okay, multiple const ptrs are allowed
+    Ref<int> c = borrow_const(owner); // const (non-mutable) ptr
+    Ref<int> d = borrow_const(owner); // okay, multiple const ptrs are allowed
     // RefMut<int> e = borrow_mut(owner); // wrong! mutable ptr is disallowed when there is a const ptr
   }
   return 0;
